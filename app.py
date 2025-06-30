@@ -28,7 +28,7 @@ class SimpleTextGame:
             reward = 0
         return self.state, reward, self.done
 
-# --- LLM Helper using HuggingFace and Prompt Engineering ---
+# --- LLM Helper using HuggingFace and Few-shot Prompting ---
 @st.cache_resource(show_spinner=False)
 def get_llm_pipeline():
     if pipeline is None:
@@ -38,21 +38,23 @@ def get_llm_pipeline():
 
 def llm_suggest_action_with_reasoning(state_text):
     """
-    Uses a HuggingFace LLM to suggest an action and provide reasoning.
-    The prompt asks the LLM to think step by step and then output an action.
+    Uses a HuggingFace LLM to suggest an action using few-shot prompting.
+    The prompt gives examples of state-action pairs to guide the model.
     """
     llm = get_llm_pipeline()
     if llm is None:
         return ("[LLM not available]", "look around")
+    # Few-shot prompt: show examples, then ask for the next action
     prompt = (
-        f"You are an agent in a text-based game.\n"
+        "State: You are in a room. Exits: north, east.\n"
+        "Action: go north\n"
+        "State: Nothing happens. Try again.\n"
+        "Action: look around\n"
         f"State: {state_text}\n"
-        f"Think step by step about what you should do next.\n"
-        f"Explain your reasoning, then suggest the best action as 'Action: <your action>'.\n"
+        "Action:"
     )
-    output = llm(prompt, max_length=80, num_return_sequences=1)[0]['generated_text']
-    # Extract reasoning and action
-    reasoning = output.split('Action:')[0].strip()
+    output = llm(prompt, max_length=len(prompt.split()) + 5, num_return_sequences=1)[0]['generated_text']
+    # Extract the action after the last 'Action:'
     action = "look around"  # default
     if 'Action:' in output:
         action_line = output.split('Action:')[-1].strip().split('\n')[0]
@@ -61,7 +63,7 @@ def llm_suggest_action_with_reasoning(state_text):
             if valid_action in action_line.lower():
                 action = valid_action
                 break
-    return (reasoning, action)
+    return ("", action)  # No reasoning, just action
 
 # --- RL Agent (LLM-guided, now with real LLM) ---
 class RLAgent:
@@ -111,7 +113,7 @@ class QLearningAgent:
 # --- Streamlit App ---
 st.set_page_config(page_title="RL + LLM Interactive Demo", layout="centered")
 st.title("Minimal RL + LLM Interactive Demo")
-st.write("Step through a simple text-based game using either an LLM-guided agent (with real LLM reasoning) or a Q-learning agent.")
+st.write("Step through a simple text-based game using either an LLM-guided agent (with real LLM action suggestion) or a Q-learning agent.")
 
 # --- Session State Initialization ---
 if 'env' not in st.session_state:
@@ -175,7 +177,7 @@ if step and not st.session_state.done:
     st.session_state.agent.update(st.session_state.state, action, reward, next_state)
     st.session_state.last_action = action
     st.session_state.last_reward = reward
-    # For LLM agent, show reasoning
+    # For LLM agent, show reasoning (now empty)
     if hasattr(st.session_state.agent, 'last_reasoning'):
         st.session_state.last_reasoning = st.session_state.agent.last_reasoning
     else:
@@ -202,8 +204,7 @@ if st.session_state.last_action is not None:
     st.write(f"**Reward:** {st.session_state.last_reward}")
     st.write(f"**Done:** {st.session_state.done}")
     st.write(f"**Step:** {st.session_state.step_count}")
-    if st.session_state.agent_type == 'llm' and st.session_state.last_reasoning:
-        st.markdown(f"**LLM Reasoning:**\n> {st.session_state.last_reasoning}")
+    # Reasoning is now omitted for distilgpt2
 
 if st.session_state.done:
     st.success("Episode finished! Click 'Reset Episode' to play again.") 
