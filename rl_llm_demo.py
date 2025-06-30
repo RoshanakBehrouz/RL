@@ -34,15 +34,16 @@ def llm_suggest_action(state_text):
         return "go north"
     return "look around"
 
-# --- RL Agent ---
+# --- RL Agent (LLM-guided) ---
 class RLAgent:
     def __init__(self):
         self.epsilon = 0.2  # Exploration rate
+        self.actions = ["go north", "go east", "look around"]
 
     def select_action(self, state_text):
         # With probability epsilon, pick a random action (exploration)
         if random.random() < self.epsilon:
-            return random.choice(["go north", "go east", "look around"])
+            return random.choice(self.actions)
         # Otherwise, use the LLM suggestion (exploitation)
         return llm_suggest_action(state_text)
 
@@ -50,12 +51,52 @@ class RLAgent:
         # For this simple demo, we don't implement learning
         pass
 
+# --- Q-Learning Agent ---
+class QLearningAgent:
+    def __init__(self, actions, alpha=0.1, gamma=0.9, epsilon=0.2):
+        self.q_table = {}  # (state, action) -> value
+        self.alpha = alpha  # Learning rate
+        self.gamma = gamma  # Discount factor
+        self.epsilon = epsilon  # Exploration rate
+        self.actions = actions
+
+    def get_q(self, state, action):
+        return self.q_table.get((state, action), 0.0)
+
+    def select_action(self, state):
+        # Epsilon-greedy action selection
+        if random.random() < self.epsilon:
+            return random.choice(self.actions)
+        # Otherwise, pick the action with the highest Q-value
+        q_values = [self.get_q(state, a) for a in self.actions]
+        max_q = max(q_values)
+        # In case of ties, randomly choose among the best
+        best_actions = [a for a, q in zip(self.actions, q_values) if q == max_q]
+        return random.choice(best_actions)
+
+    def update(self, state, action, reward, next_state):
+        # Q-learning update rule
+        old_q = self.get_q(state, action)
+        next_qs = [self.get_q(next_state, a) for a in self.actions]
+        max_next_q = max(next_qs) if next_qs else 0.0
+        new_q = old_q + self.alpha * (reward + self.gamma * max_next_q - old_q)
+        self.q_table[(state, action)] = new_q
+
 # --- Main Training Loop ---
 def main():
     env = SimpleTextGame()
-    agent = RLAgent()
+    actions = ["go north", "go east", "look around"]
 
-    for episode in range(3):
+    # Choose agent type: 'llm' for LLM-guided, 'q' for Q-learning
+    agent_type = input("Choose agent type ('llm' or 'q'): ").strip().lower()
+    if agent_type == 'q':
+        agent = QLearningAgent(actions)
+        print("Using Q-learning agent.")
+    else:
+        agent = RLAgent()
+        print("Using LLM-guided agent.")
+
+    for episode in range(5):
         print(f"\nEpisode {episode+1}")
         state = env.reset()
         done = False
