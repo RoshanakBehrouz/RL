@@ -53,7 +53,7 @@ def llm_suggest_action_with_reasoning(state_text):
         f"State: {state_text}\n"
         "Action:"
     )
-    output = llm(prompt, max_length=len(prompt.split()) + 5, num_return_sequences=1)[0]['generated_text']
+    output = llm(prompt, max_new_tokens=5, num_return_sequences=1)[0]['generated_text']
     # Extract the action after the last 'Action:'
     action = "look around"  # default
     if 'Action:' in output:
