@@ -9,8 +9,6 @@ This project demonstrates the core concepts of Reinforcement Learning (RL) and L
   - **Q-learning Agent:** Learns from experience using the Q-learning algorithm to improve its actions over time.
 - **Interactive App:** Includes a Streamlit web app for stepping through episodes and visualizing the agent's decisions.
 
-## Educational Purpose
-This project is designed to help students understand how RL agents can interact with environments and how LLMs can be used to guide or enhance decision-making. The code is kept minimal and well-commented for easy learning and experimentation.
 
 ## How to Run
 
