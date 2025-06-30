@@ -1,30 +1,41 @@
 # Minimal RL + LLM Demo
 
-This project demonstrates the basic concepts of Reinforcement Learning (RL) and Large Language Models (LLMs) in a simple, easy-to-understand way.
+This project demonstrates the core concepts of Reinforcement Learning (RL) and Large Language Models (LLMs) through a simple, hands-on example.
 
-## What does this project do?
-- **Environment:** Simulates a tiny text-based game where the agent must find the treasure by choosing the correct action.
-- **LLM (Simulated):** Uses a function to suggest the best action based on the current state description, mimicking how an LLM might help an RL agent.
-- **RL Agent:** Chooses actions using a mix of exploration (random choice) and exploitation (following the LLM's suggestion).
-- **Learning:** For simplicity, the agent does not update its policy, but the structure shows how RL and LLMs can interact.
+## Project Overview
+- **Environment:** A basic text-based game where the agent must find the treasure by choosing the correct action.
+- **Agents:**
+  - **LLM-guided Agent:** Uses a function to suggest the best action based on the current state, simulating how an LLM might assist an RL agent.
+  - **Q-learning Agent:** Learns from experience using the Q-learning algorithm to improve its actions over time.
+- **Interactive App:** Includes a Streamlit web app for stepping through episodes and visualizing the agent's decisions.
 
-## Why is this useful?
-- Shows how RL agents can use LLMs to interpret text environments or get action suggestions.
-- Provides a minimal, hands-on example suitable for learning or demonstration purposes.
+## Educational Purpose
+This project is designed to help students understand how RL agents can interact with environments and how LLMs can be used to guide or enhance decision-making. The code is kept minimal and well-commented for easy learning and experimentation.
 
-## How to run
+## How to Run
+
+### Command-Line Version
 1. Make sure you have Python 3 installed.
-2. Run the demo script:
+2. Run the script:
    ```bash
-   python rl_llm_demo.py
+   python3 rl_llm_demo.py
    ```
-3. Watch the output in your terminal. The agent will play a few episodes of the game, using the simulated LLM to help choose actions.
+3. When prompted, choose the agent type ('llm' or 'q') and observe the agent's behavior in the terminal.
 
-## File Overview
-- `rl_llm_demo.py`: The main script containing the environment, agent, LLM helper, and training loop.
+### Streamlit Interactive App
+1. Install Streamlit if you haven't already:
+   ```bash
+   pip install streamlit
+   ```
+2. Start the app:
+   ```bash
+   streamlit run app.py
+   ```
+3. Use the web interface to select the agent type, step through actions, and reset episodes as needed.
 
-## Customization
-- You can replace the `llm_suggest_action` function with a real LLM call (e.g., OpenAI API) for more advanced experiments.
+## Files
+- `rl_llm_demo.py`: Main script for running the RL + LLM demo in the terminal.
+- `app.py`: Streamlit app for interactive exploration.
 
 ---
-This project is designed to be as simple as possible for educational purposes. Perfect for showing your understanding of RL and LLM concepts! 
+This project is intended for educational purposes and as a starting point for further exploration of RL and LLM integration. 
