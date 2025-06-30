@@ -1,6 +1,13 @@
 import streamlit as st
 import random
 
+# --- HuggingFace Transformers for LLM ---
+try:
+    from transformers import pipeline
+except ImportError:
+    st.warning("Please install the 'transformers' library: pip install transformers")
+    pipeline = None
+
 # --- Simple Text-Based Environment ---
 class SimpleTextGame:
     def __init__(self):
@@ -21,27 +28,60 @@ class SimpleTextGame:
             reward = 0
         return self.state, reward, self.done
 
-# --- 'LLM' Helper Function ---
-def llm_suggest_action(state_text):
-    if "Exits: north" in state_text:
-        return "go north"
-    return "look around"
+# --- LLM Helper using HuggingFace and Prompt Engineering ---
+@st.cache_resource(show_spinner=False)
+def get_llm_pipeline():
+    if pipeline is None:
+        return None
+    return pipeline("text-generation", model="distilgpt2")
 
-# --- RL Agent (LLM-guided) ---
+
+def llm_suggest_action_with_reasoning(state_text):
+    """
+    Uses a HuggingFace LLM to suggest an action and provide reasoning.
+    The prompt asks the LLM to think step by step and then output an action.
+    """
+    llm = get_llm_pipeline()
+    if llm is None:
+        return ("[LLM not available]", "look around")
+    prompt = (
+        f"You are an agent in a text-based game.\n"
+        f"State: {state_text}\n"
+        f"Think step by step about what you should do next.\n"
+        f"Explain your reasoning, then suggest the best action as 'Action: <your action>'.\n"
+    )
+    output = llm(prompt, max_length=80, num_return_sequences=1)[0]['generated_text']
+    # Extract reasoning and action
+    reasoning = output.split('Action:')[0].strip()
+    action = "look around"  # default
+    if 'Action:' in output:
+        action_line = output.split('Action:')[-1].strip().split('\n')[0]
+        # Only allow valid actions
+        for valid_action in ["go north", "go east", "look around"]:
+            if valid_action in action_line.lower():
+                action = valid_action
+                break
+    return (reasoning, action)
+
+# --- RL Agent (LLM-guided, now with real LLM) ---
 class RLAgent:
     def __init__(self):
         self.epsilon = 0.2
         self.actions = ["go north", "go east", "look around"]
+        self.last_reasoning = ""
 
     def select_action(self, state_text):
         if random.random() < self.epsilon:
+            self.last_reasoning = "Exploring: chose a random action."
             return random.choice(self.actions)
-        return llm_suggest_action(state_text)
+        reasoning, action = llm_suggest_action_with_reasoning(state_text)
+        self.last_reasoning = reasoning
+        return action
 
     def update(self, state, action, reward, next_state):
         pass
 
-# --- Q-Learning Agent ---
+# --- Q-Learning Agent (unchanged) ---
 class QLearningAgent:
     def __init__(self, actions, alpha=0.1, gamma=0.9, epsilon=0.2):
         self.q_table = {}
@@ -71,7 +111,7 @@ class QLearningAgent:
 # --- Streamlit App ---
 st.set_page_config(page_title="RL + LLM Interactive Demo", layout="centered")
 st.title("Minimal RL + LLM Interactive Demo")
-st.write("Step through a simple text-based game using either an LLM-guided agent or a Q-learning agent.")
+st.write("Step through a simple text-based game using either an LLM-guided agent (with real LLM reasoning) or a Q-learning agent.")
 
 # --- Session State Initialization ---
 if 'env' not in st.session_state:
@@ -90,6 +130,8 @@ if 'last_action' not in st.session_state:
     st.session_state.last_action = None
 if 'last_reward' not in st.session_state:
     st.session_state.last_reward = None
+if 'last_reasoning' not in st.session_state:
+    st.session_state.last_reasoning = ""
 
 # --- Agent Selection ---
 ag_type = st.radio("Choose agent type:", ["LLM-guided", "Q-learning"],
@@ -104,6 +146,7 @@ if ag_type == "LLM-guided":
         st.session_state.step_count = 0
         st.session_state.last_action = None
         st.session_state.last_reward = None
+        st.session_state.last_reasoning = ""
 else:
     if st.session_state.agent_type != 'q':
         st.session_state.agent = QLearningAgent(["go north", "go east", "look around"])
@@ -113,6 +156,7 @@ else:
         st.session_state.step_count = 0
         st.session_state.last_action = None
         st.session_state.last_reward = None
+        st.session_state.last_reasoning = ""
 
 # --- Display Current State ---
 st.subheader("Environment State:")
@@ -131,6 +175,11 @@ if step and not st.session_state.done:
     st.session_state.agent.update(st.session_state.state, action, reward, next_state)
     st.session_state.last_action = action
     st.session_state.last_reward = reward
+    # For LLM agent, show reasoning
+    if hasattr(st.session_state.agent, 'last_reasoning'):
+        st.session_state.last_reasoning = st.session_state.agent.last_reasoning
+    else:
+        st.session_state.last_reasoning = ""
     st.session_state.state = next_state
     st.session_state.done = done
     st.session_state.step_count += 1
@@ -141,17 +190,20 @@ if reset:
     st.session_state.step_count = 0
     st.session_state.last_action = None
     st.session_state.last_reward = None
+    st.session_state.last_reasoning = ""
     if st.session_state.agent_type == 'q':
         st.session_state.agent = QLearningAgent(["go north", "go east", "look around"])
     else:
         st.session_state.agent = RLAgent()
 
-# --- Show Last Action and Reward ---
+# --- Show Last Action, Reward, and Reasoning ---
 if st.session_state.last_action is not None:
     st.write(f"**Agent action:** {st.session_state.last_action}")
     st.write(f"**Reward:** {st.session_state.last_reward}")
     st.write(f"**Done:** {st.session_state.done}")
     st.write(f"**Step:** {st.session_state.step_count}")
+    if st.session_state.agent_type == 'llm' and st.session_state.last_reasoning:
+        st.markdown(f"**LLM Reasoning:**\n> {st.session_state.last_reasoning}")
 
 if st.session_state.done:
     st.success("Episode finished! Click 'Reset Episode' to play again.") 
