@@ -53,7 +53,10 @@ def llm_suggest_action_with_reasoning(state_text):
         f"State: {state_text}\n"
         "Action:"
     )
-    output = llm(prompt, max_new_tokens=5, num_return_sequences=1)[0]['generated_text']
+    try:
+        output = llm(prompt, max_new_tokens=5, num_return_sequences=1)[0]['generated_text']
+    except Exception as e:
+        return (f"[LLM error: {e}]", "look around")
     # Extract the action after the last 'Action:'
     action = "look around"  # default
     if 'Action:' in output:
@@ -63,25 +66,52 @@ def llm_suggest_action_with_reasoning(state_text):
             if valid_action in action_line.lower():
                 action = valid_action
                 break
+        else:
+            # If LLM output is not a valid action, return a warning
+            return (f"[LLM output not recognized: {action_line}]", "look around")
+    else:
+        return (f"[LLM output missing 'Action:']", "look around")
     return ("", action)  # No reasoning, just action
 
 # --- RL Agent (LLM-guided, now with real LLM) ---
 class RLAgent:
-    def __init__(self):
-        self.epsilon = 0.2
+    def __init__(self, alpha=0.1, gamma=0.9, epsilon=0.2):
+        self.epsilon = epsilon
+        self.alpha = alpha
+        self.gamma = gamma
         self.actions = ["go north", "go east", "look around"]
+        self.q_table = {}  # (state, action) -> value
         self.last_reasoning = ""
 
+    def get_q(self, state, action):
+        return self.q_table.get((state, action), 0.0)
+
     def select_action(self, state_text):
+        # Epsilon-greedy: explore or exploit
         if random.random() < self.epsilon:
             self.last_reasoning = "Exploring: chose a random action."
             return random.choice(self.actions)
-        reasoning, action = llm_suggest_action_with_reasoning(state_text)
+        # Exploit: use LLM suggestion, but if multiple actions have same Q, use LLM to break ties
+        # Find best Q-value(s)
+        q_values = [self.get_q(state_text, a) for a in self.actions]
+        max_q = max(q_values)
+        best_actions = [a for a, q in zip(self.actions, q_values) if q == max_q]
+        if len(best_actions) == 1:
+            return best_actions[0]
+        # If tie, use LLM suggestion among best actions
+        reasoning, llm_action = llm_suggest_action_with_reasoning(state_text)
         self.last_reasoning = reasoning
-        return action
+        if llm_action in best_actions:
+            return llm_action
+        return random.choice(best_actions)
 
     def update(self, state, action, reward, next_state):
-        pass
+        # Q-learning update rule
+        old_q = self.get_q(state, action)
+        next_qs = [self.get_q(next_state, a) for a in self.actions]
+        max_next_q = max(next_qs) if next_qs else 0.0
+        new_q = old_q + self.alpha * (reward + self.gamma * max_next_q - old_q)
+        self.q_table[(state, action)] = new_q
 
 # --- Q-Learning Agent (unchanged) ---
 class QLearningAgent:
@@ -179,7 +209,7 @@ if step and not st.session_state.done:
     st.session_state.last_reward = reward
     # For LLM agent, show reasoning (now empty)
     if hasattr(st.session_state.agent, 'last_reasoning'):
-        st.session_state.last_reasoning = st.session_state.agent.last_reasoning
+        st.session_state.last_reasoning = getattr(st.session_state.agent, 'last_reasoning', "")
     else:
         st.session_state.last_reasoning = ""
     st.session_state.state = next_state

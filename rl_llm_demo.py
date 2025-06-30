@@ -36,20 +36,39 @@ def llm_suggest_action(state_text):
 
 # --- RL Agent (LLM-guided) ---
 class RLAgent:
-    def __init__(self):
-        self.epsilon = 0.2  # Exploration rate
+    def __init__(self, alpha=0.1, gamma=0.9, epsilon=0.2):
+        self.epsilon = epsilon  # Exploration rate
+        self.alpha = alpha      # Learning rate
+        self.gamma = gamma      # Discount factor
         self.actions = ["go north", "go east", "look around"]
+        self.q_table = {}       # (state, action) -> value
+
+    def get_q(self, state, action):
+        return self.q_table.get((state, action), 0.0)
 
     def select_action(self, state_text):
-        # With probability epsilon, pick a random action (exploration)
+        # Epsilon-greedy: explore or exploit
         if random.random() < self.epsilon:
             return random.choice(self.actions)
-        # Otherwise, use the LLM suggestion (exploitation)
-        return llm_suggest_action(state_text)
+        # Exploit: use LLM suggestion, but if multiple actions have same Q, use LLM to break ties
+        q_values = [self.get_q(state_text, a) for a in self.actions]
+        max_q = max(q_values)
+        best_actions = [a for a, q in zip(self.actions, q_values) if q == max_q]
+        if len(best_actions) == 1:
+            return best_actions[0]
+        # If tie, use LLM suggestion among best actions
+        llm_action = llm_suggest_action(state_text)
+        if llm_action in best_actions:
+            return llm_action
+        return random.choice(best_actions)
 
     def update(self, state, action, reward, next_state):
-        # For this simple demo, we don't implement learning
-        pass
+        # Q-learning update rule
+        old_q = self.get_q(state, action)
+        next_qs = [self.get_q(next_state, a) for a in self.actions]
+        max_next_q = max(next_qs) if next_qs else 0.0
+        new_q = old_q + self.alpha * (reward + self.gamma * max_next_q - old_q)
+        self.q_table[(state, action)] = new_q
 
 # --- Q-Learning Agent ---
 class QLearningAgent:
