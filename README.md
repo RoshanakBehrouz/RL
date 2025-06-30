@@ -35,5 +35,3 @@ This project demonstrates the core concepts of Reinforcement Learning (RL) and L
 - `rl_llm_demo.py`: Main script for running the RL + LLM demo in the terminal.
 - `app.py`: Streamlit app for interactive exploration.
 
----
-This project is intended for educational purposes and as a starting point for further exploration of RL and LLM integration. 
